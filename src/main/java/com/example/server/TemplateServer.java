@@ -1,5 +1,7 @@
 package com.example.server;
 
+import com.example.server.anvil.AnvilChunkLoader;
+import com.example.server.anvil.FileSystemStorage;
 import com.example.server.command.GamemodeCommand;
 import com.example.server.command.GiveCommand;
 import com.example.server.command.TeleportCommand;
@@ -9,15 +11,21 @@ import net.minestom.server.MinecraftServer;
 import net.minestom.server.command.CommandManager;
 import net.minestom.server.entity.Player;
 import net.minestom.server.event.GlobalEventHandler;
+import net.minestom.server.event.player.PlayerBlockBreakEvent;
 import net.minestom.server.event.player.PlayerLoginEvent;
 import net.minestom.server.extras.PlacementRules;
 import net.minestom.server.extras.optifine.OptifineSupport;
 import net.minestom.server.instance.*;
+import net.minestom.server.storage.StorageManager;
+import net.minestom.server.utils.BlockPosition;
 import net.minestom.server.utils.Position;
 
 public class TemplateServer {
 
     public static void main(String[] args) {
+
+        String worldName = "world";
+
         // Initialization
         MinecraftServer minecraftServer = MinecraftServer.init();
 
@@ -25,7 +33,11 @@ public class TemplateServer {
         // Create the instance
         InstanceContainer instanceContainer = instanceManager.createInstanceContainer();
         // Set the ChunkGenerator
-        instanceContainer.setChunkGenerator(new NoiseGenerator());
+        instanceContainer.setChunkGenerator(new StoneGenerator());
+
+        StorageManager storageManager = MinecraftServer.getStorageManager();
+        storageManager.defineDefaultStorageSystem(FileSystemStorage::new);
+        instanceContainer.setChunkLoader(new AnvilChunkLoader(storageManager.getLocation(worldName + "/region")));
 
         // Util options
         OptifineSupport.enable();
@@ -39,7 +51,13 @@ public class TemplateServer {
         globalEventHandler.addEventCallback(PlayerLoginEvent.class, event -> {
             final Player player = event.getPlayer();
             event.setSpawningInstance(instanceContainer);
-            player.setRespawnPoint(new Position(0, 42, 0));
+            player.setRespawnPoint(new Position(0, 60, 0));
+        });
+
+        globalEventHandler.addEventCallback(PlayerBlockBreakEvent.class, event -> {
+            BlockPosition blockPosition = event.getBlockPosition();
+            Chunk chunk = instanceContainer.getChunkAt(blockPosition);
+            instanceContainer.saveChunkToStorage(chunk, null);
         });
 
         // Start the server on port 25565
